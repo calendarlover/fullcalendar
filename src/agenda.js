@@ -8,6 +8,7 @@ setDefaults({
 	firstHour: 6,
 	slotMinutes: 30,
 	defaultEventMinutes: 120,
+	users: [],
 	axisFormat: 'h(:mm)tt',
 	timeFormat: {
 		agenda: 'h:mm{ - h:mm}'
@@ -113,7 +114,29 @@ function Agenda(element, options, methods) {
 	});
 	view.init(element, options);
 	
+	/* User methods -------------------------------------------------------------*/
+	function getUserName(index){
+		if($.isFunction(options.getUserName)){
+			return options.getUserName(index);
+		} else {
+			return options.users[index];
+		}
+	}
 	
+	function getUserId(index){
+		if($.isFunction(options.getUserId)){
+			return options.getUserId(index);
+		} else {
+			return index;
+		}
+	}
+	
+	function getUserPos(userId){
+		for(var i=0; i<options.users.length; i++){
+			if(getUserId(i) == userId)
+				return i;
+		}
+	}
 	
 	/* Time-slot rendering
 	-----------------------------------------------------------------------------*/
@@ -152,37 +175,62 @@ function Agenda(element, options, methods) {
 		
 		if (!head) { // first time rendering, build from scratch
 		
-			var i,
-				minutes,
-				slotNormal = options.slotMinutes % 15 == 0, //...
+			var i, minutes, colspan, s='';
+			var slotNormal = options.slotMinutes % 15 == 0;
 			
-			// head
-			s = "<div class='fc-agenda-head' style='position:relative;z-index:4'>" +
-				"<table style='width:100%'>" +
-				"<tr class='fc-first" + (options.allDaySlot ? '' : ' fc-last') + "'>" +
-				"<th class='fc-leftmost " +
-					tm + "-state-default'>&nbsp;</th>";
+			if(options.multiUser && !options.allDaySlot){
+				var uLength = options.users.length;
+			}			
+			
+			//head
+			s += '<div class="fc-agenda-head" style="position:relative;z-index:4">';
+			s += 	'<table style="width:100%">';
+			s += 		'<tr class="fc-first'+ (options.allDaySlot ? '' : ' fc-last') + '">';
+			s += 			'<th class="fc-leftmost '+ tm +'-state-default">&nbsp;</th>';
+			
 			for (i=0; i<colCnt; i++) {
-				s += "<th class='fc-" +
-					dayIDs[d.getDay()] + ' ' + // needs to be first
-					tm + '-state-default' +
-					"'>" + formatDate(d, colFormat, options) + "</th>";
+				s += 		'<th class="fc-'+ dayIDs[d.getDay()] +' '+ tm +'-state-default">';
+				s += 			formatDate(d, colFormat, options);
+				s += 		'</th>';
 				addDays(d, dis);
 				if (nwe) {
 					skipWeekend(d, dis);
 				}
 			}
-			s += "<th class='" + tm + "-state-default'>&nbsp;</th></tr>";
-			if (options.allDaySlot) {
-				s += "<tr class='fc-all-day'>" +
-						"<th class='fc-axis fc-leftmost " + tm + "-state-default'>" + options.allDayText + "</th>" +
-						"<td colspan='" + colCnt + "' class='" + tm + "-state-default'>" +
-							"<div class='fc-day-content'><div style='position:relative'>&nbsp;</div></div></td>" +
-						"<th class='" + tm + "-state-default'>&nbsp;</th>" +
-					"</tr><tr class='fc-divider fc-last'><th colspan='" + (colCnt+2) + "' class='" +
-						tm + "-state-default fc-leftmost'><div/></th></tr>";
+			s += 			'<th class="'+ tm +'-state-default">&nbsp;</th>';
+			s += 		'</tr>';
+			
+			//multiUser
+			if(options.multiUser && !options.allDaySlot){
+				s += '</table><table class="fc-users" style="width:100%">';
+				s += 	'<tr class="fc-first'+ (options.allDaySlot ? '' : ' fc-last') + '">';
+				s += 		'<th class="fc-leftmost '+ tm + '-state-default">&nbsp;</th>';
+				
+				for(var i=0; i<colCnt; i++){
+					for(var j=0; j<uLength; j++){
+						s += '<th class="fc-user-'+ getUserId(j) +' '+ tm +'-state-default" >';
+						s += 	getUserName(j);
+						s += '</th>';
+					}
+				}
+				s += 		'<th class="'+ tm +'-state-default">&nbsp;</th>';
+				s += 	'</tr>';
 			}
-			s+= "</table></div>";
+			
+			//allDaySlot
+			if (options.allDaySlot) {
+				s += 	'<tr class="fc-all-day">';
+				s += 		'<th class="fc-axis fc-leftmost '+ tm +'-state-default">'+ options.allDayText +'</th>';
+				s += 		'<td colspan="'+ colCnt +'" class="'+ tm +'-state-default">';
+				s += 			'<div class="fc-day-content"><div style="position:relative">&nbsp;</div></div>';
+				s += 		'</td>';
+				s += 		'<th class="'+ tm +'-state-default">&nbsp;</th>';
+				s += 	'</tr><tr class="fc-divider fc-last">';
+				s += 		'<th colspan="'+ (colCnt+2) +'" class="'+ tm +'-state-default fc-leftmost"><div/></th>';
+				s += 	'</tr>';
+			}
+			
+			s += '</table></div>';
 			head = $(s).appendTo(element);
 			bindDayHandlers(head.find('td'));
 			
@@ -220,18 +268,29 @@ function Agenda(element, options, methods) {
 			s = "<div class='fc-agenda-bg' style='position:absolute;z-index:1'>" +
 				"<table style='width:100%;height:100%'><tr class='fc-first'>";
 			for (i=0; i<colCnt; i++) {
-				s += "<td class='fc-" +
-					dayIDs[d.getDay()] + ' ' + // needs to be first
-					tm + '-state-default ' +
-					(!i ? 'fc-leftmost ' : '') +
-					(+d == +today ? tm + '-state-highlight fc-today' : 'fc-not-today') +
-					"'><div class='fc-day-content'><div>&nbsp;</div></div></td>";
+				if(options.multiUser && !options.allDaySlot){
+					for(var j=0; j<uLength; j++){
+						s += '<td class="fc-'+ dayIDs[d.getDay()] +' ' +
+								tm +'-state-default ' +
+								(i==0 && j==0 ? 'fc-leftmost ' : '') +
+								(+d == +today ? tm +'-state-highlight fc-today' : 'fc-not-today') +'">';
+						s += 	'<div class="fc-day-content"><div>&nbsp;</div></div>';
+						s += '</td>';
+					}
+				} else {
+					s += '<td class="fc-'+ dayIDs[d.getDay()] +' ' +
+							tm +'-state-default ' +
+							(!i ? 'fc-leftmost ' : '') +
+							(+d == +today ? tm +'-state-highlight fc-today' : 'fc-not-today') +'">';
+					s += 	'<div class="fc-day-content"><div>&nbsp;</div></div>';
+					s += '</td>';
+				}
 				addDays(d, dis);
 				if (nwe) {
 					skipWeekend(d, dis);
 				}
 			}
-			s += "</tr></table></div>";
+			s += '</tr></table></div>';
 			bg = $(s).appendTo(element);
 			
 		}else{ // skeleton already built, just modify it
@@ -271,7 +330,7 @@ function Agenda(element, options, methods) {
 		
 		}
 		
-	}
+	};
 	
 	
 	function resetScroll() {
@@ -313,16 +372,19 @@ function Agenda(element, options, methods) {
 		body.width(width);
 		bodyTable.width('');
 		
-		var topTDs = head.find('tr:first th'),
-			stripeTDs = bg.find('td'),
-			clientWidth = body[0].clientWidth;
+		var topTDs = head.find('tr:first th');
+		if(options.multiUser && !options.allDaySlot){
+			var userTDs = head.find('table.fc-users th');
+		}
+		var stripeTDs = bg.find('td');
+		var clientWidth = body[0].clientWidth;
 			
 		bodyTable.width(clientWidth);
 		
 		// time-axis width
 		axisWidth = 0;
 		setOuterWidth(
-			head.find('tr:lt(2) th:first').add(body.find('tr:first th'))
+			head.find('tr:lt(2) th.fc-leftmost').add(body.find('tr:first th'))
 				.width('')
 				.each(function() {
 					axisWidth = Math.max(axisWidth, $(this).outerWidth());
@@ -330,9 +392,15 @@ function Agenda(element, options, methods) {
 			axisWidth
 		);
 		
+		var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
 		// column width
 		colWidth = Math.floor((clientWidth - axisWidth) / colCnt);
-		setOuterWidth(stripeTDs.slice(0, -1), colWidth);
+		setOuterWidth(stripeTDs.slice(0, -1), colWidth/mult);
+		
+		if(options.multiUser && !options.allDaySlot){
+			setOuterWidth(userTDs.slice(1, -2), colWidth/mult);
+			setOuterWidth(userTDs.slice(-2, -1), clientWidth - axisWidth - colWidth*(colCnt-1/mult));
+		}
 		setOuterWidth(topTDs.slice(1, -2), colWidth);
 		setOuterWidth(topTDs.slice(-2, -1), clientWidth - axisWidth - colWidth*(colCnt-1));
 		
@@ -340,6 +408,8 @@ function Agenda(element, options, methods) {
 			left: axisWidth,
 			width: clientWidth - axisWidth
 		});
+		
+		colWidth /= mult;
 	}
 	
 	
@@ -451,7 +521,7 @@ function Agenda(element, options, methods) {
 				level = col[j];
 				for (k=0; k<level.length; k++) {
 					seg = level[k];
-					seg.col = i;
+					seg.col = i*options.users.length + 1 + getUserPos(seg.event.userId);
 					seg.level = j;
 					segs.push(seg);
 				}
@@ -529,7 +599,7 @@ function Agenda(element, options, methods) {
 			}
 			top = timePosition(seg.start, seg.start);
 			bottom = timePosition(seg.start, seg.end);
-			colI = seg.col;
+			colI = seg.col-1;
 			levelI = seg.level;
 			forward = seg.forward || 0;
 			leftmost = axisWidth + colContentPositions.left(colI*dis + dit);
@@ -862,13 +932,14 @@ function Agenda(element, options, methods) {
 					matrix.mouse(ev.pageX, ev.pageY);
 				},
 				stop: function(ev, ui) {
-					view.clearOverlays();
 					view.trigger('eventDragStop', eventElement, event, ev, ui);
+					view.clearOverlays();
+					var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
 					var cell = matrix.cell,
 						dayDelta = dis * (
 							allDay ? // can't trust cell.colDelta when using slot grid
 							(cell ? cell.colDelta : 0) : 
-							Math.floor((ui.position.left - origPosition.left) / colWidth)
+							Math.floor((ui.position.left - origPosition.left) / colWidth / mult)
 						);
 					if (!cell || !slotDelta && !dayDelta) {
 						resetElement();

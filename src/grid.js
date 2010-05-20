@@ -302,11 +302,11 @@ function Grid(element, options, methods) {
 			}
 		
 		}
-		
-	}
 	
-	
-	
+	};
+
+
+
 	function setHeight(height) {
 		viewHeight = height;
 		var leftTDs = tbody.find('tr td:first-child'),
@@ -337,10 +337,15 @@ function Grid(element, options, methods) {
 	
 	function setWidth(width) {
 		viewWidth = width;
+		if(options.multiUser && !options.allDaySlot){
+			colWidth = Math.floor(viewWidth / colCnt);
+		} else {
+			colWidth = Math.floor(viewWidth / colCnt*options.users.length);
+		}
 		dayContentPositions.clear();
 		setOuterWidth(
 			thead.find('th').slice(0, -1),
-			colWidth = Math.floor(viewWidth / colCnt)
+			colWidth
 		);
 	}
 
@@ -402,7 +407,7 @@ function Grid(element, options, methods) {
 			view,
 			0,
 			viewWidth,
-			function(i) { return tbody.find('tr:eq('+i+')') },
+			function(i) { return tbody.find('tr:eq('+i+')'); },
 			dayContentPositions.left,
 			dayContentPositions.right,
 			segmentContainer,
@@ -581,7 +586,7 @@ function Grid(element, options, methods) {
 	view.buildMatrix = buildMatrix;
 	
 
-}
+};
 
 
 function _renderDaySegs(segs, rowCnt, view, minLeft, maxLeft, getRow, dayContentLeft, dayContentRight, segmentContainer, bindSegHandlers, modifiedEventId) {

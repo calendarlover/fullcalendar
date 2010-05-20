@@ -827,7 +827,7 @@ $.fn.fullCalendar = function(options) {
 					lateRender();
 				}
 			}
-		}
+		};
 		$(window).resize(windowResize);
 		
 		
