@@ -912,12 +912,12 @@ function Agenda(element, options, methods) {
 					view.trigger('eventDragStop', eventElement, event, ev, ui);
 					view.clearOverlays();
 					var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
-					var cell = matrix.cell,
-						dayDelta = dis * (
-							allDay ? // can't trust cell.colDelta when using slot grid
-							(cell ? cell.colDelta : 0) : 
-							Math.floor((ui.position.left - origPosition.left) / colWidth / mult)
-						);
+					var cell = matrix.cell;
+					var dayDelta = dis * (
+						allDay ? // can't trust cell.colDelta when using slot grid
+							(cell ? cell.colDelta : 0) :
+							Math.floor((Math.floor((ui.position.left - origPosition.left) / colWidth + 0.01) + getUserPos(event.userId)) / mult) // 0.01 to avoid rounding issues
+					);
 					if (!cell || !slotDelta && !dayDelta) {
 						resetElement();
 						if ($.browser.msie) {
@@ -928,9 +928,11 @@ function Agenda(element, options, methods) {
 						eventElement.css(origPosition); // sometimes fast drags make event revert to wrong position
 						view.showEvents(event, eventElement);
 					}else{
+						var newUserId = getUserId(cell.col%options.users.length);
 						view.eventDrop(
 							this, event, dayDelta,
 							allDay ? 0 : slotDelta * options.slotMinutes, // minute delta
+							newUserId,
 							allDay, ev, ui
 						);
 					}

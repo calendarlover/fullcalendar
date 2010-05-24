@@ -116,12 +116,12 @@ var viewMethods = {
 	
 	// event modification reporting
 	
-	eventDrop: function(e, event, dayDelta, minuteDelta, allDay, ev, ui) {
+	eventDrop: function(e, event, dayDelta, minuteDelta, newUserId, allDay, ev, ui) {
 		var view = this,
 			oldAllDay = event.allDay,
 			eventId = event._id;
 		view.moveEvents(view.eventsByID[eventId], dayDelta, minuteDelta, allDay);
-		view.trigger('eventDrop', e, event, dayDelta, minuteDelta, allDay, function() { // TODO: change docs
+		view.trigger('eventDrop', e, event, dayDelta, minuteDelta, newUserId, allDay, function() { // TODO: change docs
 			// TODO: investigate cases where this inverse technique might not work
 			view.moveEvents(view.eventsByID[eventId], -dayDelta, -minuteDelta, oldAllDay);
 			view.rerenderEvents();
