@@ -8,7 +8,7 @@ setDefaults({
 	firstHour: 6,
 	slotMinutes: 30,
 	defaultEventMinutes: 120,
-	users: [],
+	users: [''],
 	axisFormat: 'h(:mm)tt',
 	timeFormat: {
 		agenda: 'h:mm{ - h:mm}'
@@ -129,7 +129,7 @@ function Agenda(element, options, methods) {
 		if($.isFunction(options.getUserId)){
 			return options.getUserId(index);
 		} else {
-			return index;
+			return index%options.users.length;
 		}
 	}
 	
@@ -138,6 +138,7 @@ function Agenda(element, options, methods) {
 			if(getUserId(i) == userId)
 				return i;
 		}
+		return 0;
 	}
 	
 	/* Time-slot rendering
@@ -521,7 +522,10 @@ function Agenda(element, options, methods) {
 				level = col[j];
 				for (k=0; k<level.length; k++) {
 					seg = level[k];
-					seg.col = i*options.users.length + 1 + getUserPos(seg.event.userId);
+					//if(options.multiUser && !options.allDaySlot)
+						seg.col = i*options.users.length + getUserPos(seg.event.userId);
+					//else
+						//seg.col = i;
 					seg.level = j;
 					segs.push(seg);
 				}
@@ -599,7 +603,7 @@ function Agenda(element, options, methods) {
 			}
 			top = timePosition(seg.start, seg.start);
 			bottom = timePosition(seg.start, seg.end);
-			colI = seg.col-1;
+			colI = seg.col;
 			levelI = seg.level;
 			forward = seg.forward || 0;
 			leftmost = axisWidth + colContentPositions.left(colI*dis + dit);
@@ -912,12 +916,12 @@ function Agenda(element, options, methods) {
 					view.trigger('eventDragStop', eventElement, event, ev, ui);
 					view.clearOverlays();
 					var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
-					var cell = matrix.cell,
-						dayDelta = dis * (
-							allDay ? // can't trust cell.colDelta when using slot grid
-							(cell ? cell.colDelta : 0) : 
-							Math.floor((ui.position.left - origPosition.left) / colWidth / mult)
-						);
+					var cell = matrix.cell;
+					var dayDelta = dis * (
+						allDay ? // can't trust cell.colDelta when using slot grid
+							(cell ? cell.colDelta : 0) :
+							Math.floor((Math.floor((ui.position.left - origPosition.left) / colWidth + 0.01) + getUserPos(event.userId)) / mult) // 0.01 to avoid rounding issues
+					);
 					if (!cell || !slotDelta && !dayDelta) {
 						resetElement();
 						if ($.browser.msie) {
@@ -928,9 +932,11 @@ function Agenda(element, options, methods) {
 						eventElement.css(origPosition); // sometimes fast drags make event revert to wrong position
 						view.showEvents(event, eventElement);
 					}else{
+						var newUserId = getUserId(cell.col%options.users.length);
 						view.eventDrop(
 							this, event, dayDelta,
 							allDay ? 0 : slotDelta * options.slotMinutes, // minute delta
+							newUserId,
 							allDay, ev, ui
 						);
 					}
@@ -1055,8 +1061,9 @@ function Agenda(element, options, methods) {
 		function slotSelectionMousedown(ev) {
 			selectionMatrix = buildSlotMatrix(function(cell) {
 				if (cell) {
-					var d = slotCellDate(cell.row, cell.origCol);
-					slotSelectionManager.drag(d, addMinutes(cloneDate(d), options.slotMinutes), false);
+					var d = slotCellDate(cell.row, Math.floor(cell.origCol/options.users.length));
+					var pos = getUserPos(getUserId(cell.origCol));
+					slotSelectionManager.drag(d, addMinutes(cloneDate(d), options.slotMinutes), false, pos);
 				}else{
 					slotSelectionManager.drag();
 				}
@@ -1078,13 +1085,13 @@ function Agenda(element, options, methods) {
 	
 	}
 	
-	function renderSlotSelection(startDate, endDate) {
+	function renderSlotSelection(startDate, endDate, col) {
 		// startDate and endDate are assumed to be in same day
 		var helperOption = view.option('selectHelper');
 		if (helperOption) {
 			var startCell = slotDateCell(startDate);
 			var endCell = slotDateCell(endDate);
-			var rect = selectionMatrix.rect(startCell[0], startCell[1], endCell[0], startCell[1]+1, bodyContent);
+			var rect = selectionMatrix.rect(startCell[0], startCell[1]*options.users.length+col, endCell[0], startCell[1]*options.users.length+col+1, bodyContent);
 			rect.left += 2;
 			rect.width -= 5;
 			if ($.isFunction(helperOption)) {

@@ -18,7 +18,7 @@ function SelectionManager(view, displayFunc, clearFunc) {
 	};
 	
 	
-	t.drag = function(currentStart, currentEnd, currentAllDay) {
+	t.drag = function(currentStart, currentEnd, currentAllDay, col) {
 		if (currentStart) {
 			var range = [currentStart, currentEnd];
 			if (!initialRange) {
@@ -29,7 +29,7 @@ function SelectionManager(view, displayFunc, clearFunc) {
 			end = dates[3];
 			allDay = currentAllDay;
 			clearFunc();
-			displayFunc(cloneDate(start), cloneDate(end), allDay);
+			displayFunc(cloneDate(start), cloneDate(end), col);
 		}else{
 			// called with no arguments
 			start = end = undefined;
