@@ -1,3 +1,1 @@
 
-this 'fcdraggables' branch has been superceded by version 1.4.7 with the [dropping](http://arshaw.com/fullcalendar/docs/dropping/) options
-==========================================================================================================================================
