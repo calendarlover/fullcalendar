@@ -1,4 +1,41 @@
 
+version 1.4.10 (1/2/11)
+	- fixed bug with resizing event to different week in 5-day month view (issue 740)
+	- fixed bug with events not sticking after a removeEvents call (issue 757)
+	- fixed bug with underlying parseTime method, and other uses of parseInt (issue 688)
+
+version 1.4.9 (11/16/10)
+	- new algorithm for vertically stacking events (issue 111)
+	- resizing an event to a different week (issue 306)
+	- bug: some events not rendered with consecutive calls to addEventSource (issue 679)
+
+version 1.4.8 (10/16/10)
+	- ignoreTimezone option (set to `false` to process UTC offsets in ISO8601 dates)
+	- bugfixes
+		- event refetching not being called under certain conditions (issues 417, 554)
+		- event refetching being called multiple times under certain conditions (issues 586, 616)
+		- selection cannot be triggered by right mouse button (issue 558)
+		- agenda view left axis sized incorrectly (issue 465)
+		- IE js error when calendar is too narrow (issue 517)
+		- agenda view looks strange when no scrollbars (issue 235)
+		- improved parsing of ISO8601 dates with UTC offsets
+	- $.fullCalendar.version
+	- an internal refactor of the code, for easier future development and modularity
+
+version 1.4.7 (7/5/10)
+	- "dropping" external objects onto the calendar
+		- droppable (boolean, to turn on/off)
+		- dropAccept (to filter which events the calendar will accept)
+		- drop (trigger)
+	- selectable options can now be specified with a View Option Hash
+	- bugfixes
+		- dragged & reverted events having wrong time text (issue 406)
+		- bug rendering events that have an endtime with seconds, but no hours/minutes (issue 477)
+		- gotoDate date overflow bug (issue 429)
+		- wrong date reported when clicking on edge of last column in agenda views (412)
+	- support newlines in event titles
+	- select/unselect callbacks now passes native js event
+
 version 1.4.6 (5/31/10)
 	- "selecting" days or timeslots
 		- options: selectable, selectHelper, unselectAuto, unselectCancel

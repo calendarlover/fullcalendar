@@ -8,6 +8,7 @@ function SelectionManager(view, initFunc, displayFunc, clearFunc) {
 	var start;
 	var end;
 	var allDay;
+	var userId;
 	
 	
 	t.dragStart = function(ev) {
@@ -18,7 +19,7 @@ function SelectionManager(view, initFunc, displayFunc, clearFunc) {
 	};
 	
 	
-	t.drag = function(currentStart, currentEnd, currentAllDay, col) {
+	t.drag = function(currentStart, currentEnd, currentAllDay, col, paramUserId) {
 		if (currentStart) {
 			var range = [currentStart, currentEnd];
 			if (!initialRange) {
@@ -28,6 +29,7 @@ function SelectionManager(view, initFunc, displayFunc, clearFunc) {
 			start = dates[0];
 			end = dates[3];
 			allDay = currentAllDay;
+			userId = paramUserId;
 			clearFunc();
 			displayFunc(cloneDate(start), cloneDate(end), col);
 		}else{
@@ -60,7 +62,7 @@ function SelectionManager(view, initFunc, displayFunc, clearFunc) {
 	
 	function _select() { // just set the selected flag, and trigger
 		selected = true;
-		view.trigger('select', view, start, end, allDay);
+		view.trigger('select', view, start, end, allDay, userId);
 	}
 	
 	
