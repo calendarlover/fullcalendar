@@ -19,7 +19,7 @@ var defaults = {
 	weekends: true,
 	
 	// editing
-	//editable: false,
+	//editable: true,
 	//disableDragging: false,
 	//disableResizing: false,
 	
@@ -71,7 +71,22 @@ var defaults = {
 	},
 	
 	//selectable: false,
-	unselectAuto: true
+	unselectAuto: true,
+	
+	//multi-user
+	multiUser: {
+		active: false,
+		forceVisible: false,
+		visible: true,
+		filterId: '#fc-filters',
+		users: []
+	},
+	
+	//freebusy
+	freeBusy: {
+		active: false,
+		freeByDefault: false
+	}
 	
 };
 
@@ -147,6 +162,20 @@ $.fn.fullCalendar = function(options) {
 	);
 	var tm = options.theme ? 'ui' : 'fc'; // for making theme classes
 	
+	options.userManager = new UserManager({multiUser: options.multiUser});
+	options.multiUser = options.userManager.multiUser;
+	
+	if (options.multiUser) {
+		options.allDaySlot = false;
+	}
+	
+	if (options.freeBusy.active) {
+		options.FBManager = new FreeBusyManager({start: new Date('2000-01-01'), end: new Date('2100-01-01'), freeBusy: options.freeBusy, userManager: options.userManager});
+		options.FBManager.load(options.freeBusy.freeBusys);
+		options.freeBusy = options.FBManager.active;
+	} else {
+		options.freeBusy = false;
+	}
 	
 	this.each(function() {
 	
@@ -176,8 +205,19 @@ $.fn.fullCalendar = function(options) {
 		if (options.theme) {
 			element.addClass('ui-widget');
 		}
-		
-		setYMD(date, options.year, options.month, options.date);
+			
+		if (options.year !== undefined && options.year != date.getFullYear()) {
+			date.setDate(1);
+			date.setMonth(0);
+			date.setFullYear(options.year);
+		}
+		if (options.month !== undefined && options.month != date.getMonth()) {
+			date.setDate(1);
+			date.setMonth(options.month);
+		}
+		if (options.date !== undefined) {
+			date.setDate(options.date);
+		}
 		
 		
 		
@@ -258,6 +298,9 @@ $.fn.fullCalendar = function(options) {
 					}else{
 						view.renderEvents(events); // don't refetch
 					}
+					if (options.freeBusy){
+						view.renderFreeBusys(options.FBManager);
+					}
 				}
 				else if (view.sizeDirty || view.eventsDirty || !options.lazyFetching) {
 					view.clearEvents();
@@ -268,6 +311,10 @@ $.fn.fullCalendar = function(options) {
 						view.renderEvents(events); // don't refetch
 					}else{
 						fetchAndRenderEvents();
+					}
+					if (options.freeBusy){
+						view.clearFreeBusys();
+						view.renderFreeBusys(options.FBManager);
 					}
 				}
 				elementOuterWidth = element.outerWidth();
@@ -517,7 +564,15 @@ $.fn.fullCalendar = function(options) {
 				if (typeof year == 'object') {
 					date = cloneDate(year); // provided 1 argument, a Date
 				}else{
-					setYMD(date, year, month, dateNum);
+					if (year !== undefined) {
+						date.setFullYear(year);
+					}
+					if (month !== undefined) {
+						date.setMonth(month);
+					}
+					if (dateNum !== undefined) {
+						date.setDate(dateNum);
+					}
 				}
 				render();
 			},
@@ -657,6 +712,20 @@ $.fn.fullCalendar = function(options) {
 			
 			unselect: function() {
 				view.unselect();
+			},
+			
+			hideAndRender: function() {
+				var len = events.length;
+				
+				for (var i=0; i<len; i++) {
+					events[i].visible = options.userManager.isVisible(events[i].userId);
+				}
+				this.render();
+			},
+			
+			changeUser: function(multiUser) {
+				options.userManager = new UserManager({multiUser: multiUser});
+				options.multiUser = options.userManager.multiUser;
 			}
 			
 		};
@@ -821,6 +890,21 @@ $.fn.fullCalendar = function(options) {
 		$(window).resize(windowResize);
 		
 		
+		if (options.droppable) {
+			$(document)
+				.bind('dragstart', function(ev, ui) {
+					if (view.isExternalDraggable(ev.target)) {
+						view.dragStart(ev, ui);
+					}
+				})
+				.bind('dragstop', function(ev, ui) {
+					if (view.isExternalDraggable(ev.target)) {
+						view.dragStop(ev, ui);
+					}
+				});
+		}
+		
+		
 		// let's begin...
 		changeView(options.defaultView);
 		
@@ -878,6 +962,13 @@ function normalizeEvent(event, options) {
 		}
 	}else{
 		event.className = [];
+	}
+	
+	//TODO: multiUser
+	if (options.multiUser && !options.userManager.isVisible(event.userId)) {
+		event.visible = false;
+	} else {
+		event.visible = true;
 	}
 }
 // TODO: if there is no start date, return false to indicate an invalid event

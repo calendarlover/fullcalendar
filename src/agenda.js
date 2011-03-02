@@ -8,7 +8,6 @@ setDefaults({
 	firstHour: 6,
 	slotMinutes: 30,
 	defaultEventMinutes: 120,
-	users: [''],
 	axisFormat: 'h(:mm)tt',
 	timeFormat: {
 		agenda: 'h:mm{ - h:mm}'
@@ -81,6 +80,7 @@ function Agenda(element, options, methods) {
 		cachedEvents=[],
 		daySegmentContainer,
 		slotSegmentContainer,
+		fbSegmentContainer,
 		tm, firstDay,
 		nwe,            // no weekends (int)
 		rtl, dis, dit,  // day index sign / translate
@@ -93,13 +93,17 @@ function Agenda(element, options, methods) {
 		slotSelectionManager,
 		selectionHelper,
 		selectionMatrix,
+		// freeBusy
+		cachedFreeBusys=[],
 		// ...
 		
 	view = $.extend(this, viewMethods, methods, {
 		renderAgenda: renderAgenda,
 		renderEvents: renderEvents,
 		rerenderEvents: rerenderEvents,
+		renderFreeBusys: renderFreeBusys,
 		clearEvents: clearEvents,
+		clearFreeBusys: clearFreeBusys,
 		setHeight: setHeight,
 		setWidth: setWidth,
 		beforeHide: function() {
@@ -117,31 +121,6 @@ function Agenda(element, options, methods) {
 		}
 	});
 	view.init(element, options);
-	
-	/* User methods -------------------------------------------------------------*/
-	function getUserName(index){
-		if($.isFunction(options.getUserName)){
-			return options.getUserName(index);
-		} else {
-			return options.users[index];
-		}
-	}
-	
-	function getUserId(index){
-		if($.isFunction(options.getUserId)){
-			return options.getUserId(index);
-		} else {
-			return index%options.users.length;
-		}
-	}
-	
-	function getUserPos(userId){
-		for(var i=0; i<options.users.length; i++){
-			if(getUserId(i) == userId)
-				return i;
-		}
-		return 0;
-	}
 	
 	/* Time-slot rendering
 	-----------------------------------------------------------------------------*/
@@ -177,10 +156,6 @@ function Agenda(element, options, methods) {
 			var i, minutes, colspan, s='';
 			var slotNormal = options.slotMinutes % 15 == 0;
 			
-			if(options.multiUser && !options.allDaySlot){
-				var uLength = options.users.length;
-			}			
-			
 			//head
 			s += '<div class="fc-agenda-head" style="position:relative;z-index:4">';
 			s += 	'<table style="width:100%">';
@@ -200,15 +175,15 @@ function Agenda(element, options, methods) {
 			s += 		'</tr>';
 			
 			//multiUser
-			if(options.multiUser && !options.allDaySlot){
+			if(options.multiUser){
 				s += '</table><table class="fc-users" style="width:100%">';
 				s += 	'<tr class="fc-first'+ (options.allDaySlot ? '' : ' fc-last') + '">';
 				s += 		'<th class="fc-leftmost '+ tm + '-state-default">&nbsp;</th>';
 				
 				for(var i=0; i<colCnt; i++){
-					for(var j=0; j<uLength; j++){
-						s += '<th class="fc-user-'+ getUserId(j) +' '+ tm +'-state-default" >';
-						s += 	getUserName(j);
+					for(var j=0; j<options.userManager.nbUsers(false); j++){
+						s += '<th class="fc-user-'+ options.userManager.getUserId(j, false) +' '+ tm +'-state-default" >';
+						s += 	options.userManager.getUserName(j);
 						s += '</th>';
 					}
 				}
@@ -258,18 +233,24 @@ function Agenda(element, options, methods) {
 					.append(bodyTable = $(s)))
 				.appendTo(element);
 			slotBind(body.find('td'));
+			//slotBind(body);
 			
 			// slot event container
 			slotSegmentContainer = $("<div style='position:absolute;z-index:8;top:0;left:0'/>").appendTo(bodyContent);
+			
+			if (options.freeBusy) {
+				fbSegmentContainer = $("<div style='position:absolute;z-index:7;top:0;left:0'/>").appendTo(bodyContent);
+			}
 			
 			// background stripes
 			d = cloneDate(d0);
 			s = "<div class='fc-agenda-bg' style='position:absolute;z-index:1'>" +
 				"<table style='width:100%;height:100%'><tr class='fc-first'>";
 			for (i=0; i<colCnt; i++) {
-				if(options.multiUser && !options.allDaySlot){
-					for(var j=0; j<uLength; j++){
-						s += '<td class="fc-'+ dayIDs[d.getDay()] +' ' +
+				if(options.multiUser){
+					for(var j=0; j<options.userManager.nbUsers(false); j++){
+						s += '<td class="fc-'+ dayIDs[d.getDay()] + ' ' +
+								'fc-user-' + options.userManager.getUserId(j, false) + ' ' +
 								tm +'-state-default ' +
 								(i==0 && j==0 ? 'fc-leftmost ' : '') +
 								(+d == +today ? tm +'-state-highlight fc-today' : 'fc-not-today') +'">';
@@ -295,6 +276,10 @@ function Agenda(element, options, methods) {
 		}else{ // skeleton already built, just modify it
 		
 			clearEvents();
+			if (options.freeBusy) {
+				clearFreeBusys();
+			}
+			
 			
 			// redo column header text and class
 			head.find('tr:first th').slice(1, -1).each(function() {
@@ -306,6 +291,7 @@ function Agenda(element, options, methods) {
 				}
 			});
 			
+			i=0;
 			// change classes of background stripes
 			d = cloneDate(d0);
 			bg.find('td').each(function() {
@@ -321,7 +307,9 @@ function Agenda(element, options, methods) {
 						.removeClass('fc-today')
 						.removeClass(tm + '-state-highlight');
 				}
-				addDays(d, dis);
+				if (!options.multiUser || ++i%options.userManager.nbUsers()==0) {
+					addDays(d, dis);
+				}
 				if (nwe) {
 					skipWeekend(d, dis);
 				}
@@ -372,7 +360,7 @@ function Agenda(element, options, methods) {
 		bodyTable.width('');
 		
 		var topTDs = head.find('tr:first th');
-		if(options.multiUser && !options.allDaySlot){
+		if(options.multiUser){
 			var userTDs = head.find('table.fc-users th');
 		}
 		var stripeTDs = bg.find('td');
@@ -384,21 +372,26 @@ function Agenda(element, options, methods) {
 		axisWidth = 0;
 		setOuterWidth(
 			head.find('tr:lt(2) th.fc-leftmost').add(body.find('tr:first th'))
-				.width('')
+				//.width('')
 				.each(function() {
 					axisWidth = Math.max(axisWidth, $(this).outerWidth());
 				}),
 			axisWidth
 		);
 		
-		var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
+		var nbUsers = 1;
+		if (options.multiUser) {
+			hide();
+			nbUsers = options.userManager.nbUsers();
+		}
+		
 		// column width
 		colWidth = Math.floor((clientWidth - axisWidth) / colCnt);
-		setOuterWidth(stripeTDs.slice(0, -1), colWidth/mult);
+		setOuterWidth(stripeTDs.slice(0, -1), colWidth/nbUsers);
 		
-		if(options.multiUser && !options.allDaySlot){
-			setOuterWidth(userTDs.slice(1, -2), colWidth/mult);
-			setOuterWidth(userTDs.slice(-2, -1), clientWidth - axisWidth - colWidth*(colCnt-1/mult));
+		if(options.multiUser){
+			setOuterWidth(userTDs.slice(1, -2), colWidth/nbUsers);
+			setOuterWidth(userTDs.slice(-2, -1), clientWidth - axisWidth - colWidth*(colCnt-1/nbUsers));
 		}
 		setOuterWidth(topTDs.slice(1, -2), colWidth);
 		setOuterWidth(topTDs.slice(-2, -1), clientWidth - axisWidth - colWidth*(colCnt-1));
@@ -408,7 +401,7 @@ function Agenda(element, options, methods) {
 			width: clientWidth - axisWidth
 		});
 		
-		colWidth /= mult;
+		colWidth /= nbUsers;
 	}
 	
 	
@@ -431,8 +424,8 @@ function Agenda(element, options, methods) {
 	
 	function slotClick(ev) {
 		if (!view.option('selectable')) { // SelectionManager will worry about dayClick
-			var col = Math.min(colCnt-1, Math.floor((ev.pageX - bg.offset().left) / colWidth)),
-				date = addDays(cloneDate(view.visStart), col*dis+dit),
+			var col = Math.floor((ev.pageX - bg.offset().left) / colWidth),
+				date = addDays(cloneDate(view.visStart), dit + dis*col),
 				rowMatch = this.className.match(/fc-slot(\d+)/);
 			if (rowMatch) {
 				var mins = parseInt(rowMatch[1]) * options.slotMinutes,
@@ -452,15 +445,23 @@ function Agenda(element, options, methods) {
 	-----------------------------------------------------------------------------*/
 	
 	function renderEvents(events, modifiedEventId) {
-		view.reportEvents(cachedEvents = events);
-		var i, len=events.length,
+		var len = events.length,
+			visibleEvents = [];
+		for (var i=0; i<len; i++) {
+			if (events[i].visible) {
+				visibleEvents.push(events[i]);
+			}
+		}
+		
+		view.reportEvents(cachedEvents = visibleEvents);
+		var i, len=visibleEvents.length,
 			dayEvents=[],
 			slotEvents=[];
 		for (i=0; i<len; i++) {
-			if (events[i].allDay) {
-				dayEvents.push(events[i]);
+			if (visibleEvents[i].allDay) {
+				dayEvents.push(visibleEvents[i]);
 			}else{
-				slotEvents.push(events[i]);
+				slotEvents.push(visibleEvents[i]);
 			}
 		}
 		renderDaySegs(compileDaySegs(dayEvents), modifiedEventId);
@@ -473,6 +474,25 @@ function Agenda(element, options, methods) {
 		renderEvents(cachedEvents, modifiedEventId);
 	}
 	
+	function renderFreeBusys(FBM) {
+		var col=0,
+			userId,
+			freeBusys;
+		for (var date=cloneDate(view.visStart); date<view.visEnd; date=addDays(date, 1)) {
+			var users = options.userManager.getVisibleUsers(),
+				userId,
+				len = users.length;
+			
+			for (var i=0; i<len; i++) {
+				userId = options.userManager.getUserId(i);
+				freeBusys = FBM.getFreeBusys(date, addDays(cloneDate(date), 1), userId);
+				$.each(freeBusys, function(){
+					renderFreeBusy(this, col, userId);
+				});
+			}
+			col++;
+		}
+	}
 	
 	function clearEvents() {
 		view._clearEvents(); // only clears the hashes
@@ -480,9 +500,42 @@ function Agenda(element, options, methods) {
 		slotSegmentContainer.empty();
 	}
 	
+	function clearFreeBusys() {
+		fbSegmentContainer.empty();
+	}
 	
+	function renderFreeBusy(freeBusy, col, userId) {
+		var userPos = options.userManager.getUserPos(userId),
+			userPosV = options.userManager.getUserPos(userId, false);
+		
+		col = col*options.userManager.nbUsers() + userPos;
+		var left = col*colWidth + axisWidth,
+			top = timePosition(freeBusy.getStart(), freeBusy.getStart()),
+			bottom = timePosition(freeBusy.getStart(), freeBusy.getEnd()),
+			width = col == colCnt*options.userManager.nbUsers()-1 ? viewWidth - left : colWidth;
+		
+		$('<div class="fc-user-' + userId + ' fc-freeBusy"></div>')
+		.css({
+			top: top,
+			height: bottom - top,
+			left: left + (rtl ? colWidth*colCnt - 2*left: 0),
+			width: width
+		})
+		.appendTo(fbSegmentContainer);
+	}
 	
-	
+	function hide() {
+		var users = options.userManager.getUsers(),
+			len = users.length;
+		
+		for (var i=0; i<len; i++) {
+			if (options.userManager.isVisibleIndex(i, false)) {
+				$('.fc-user-' + users[i].id).show();
+			} else {
+				$('.fc-user-' + users[i].id).hide();
+			}
+		}
+	}
 	
 	function compileDaySegs(events) {
 		var levels = stackSegs(view.sliceSegs(events, $.map(events, exclEndDay), view.visStart, view.visEnd)),
@@ -510,13 +563,17 @@ function Agenda(element, options, methods) {
 			k, seg,
 			segs=[];
 		for (i=0; i<colCnt; i++) {
-			col = stackSegs(view.sliceSegs(events, visEventEnds, d, addMinutes(cloneDate(d), maxMinute-minMinute)));
-			countForwardSegs(col);
+			col = stackSegs(view.sliceSegs(events, visEventEnds, d, addMinutes(cloneDate(d), maxMinute-minMinute)), options.multiUser);
+			countForwardSegs(col, options.multiUser);
 			for (j=0; j<col.length; j++) {
 				level = col[j];
 				for (k=0; k<level.length; k++) {
 					seg = level[k];
-					seg.col = i*options.users.length + getUserPos(seg.event.userId);
+					if(options.multiUser) {
+						seg.col = i*options.userManager.nbUsers(false) + options.userManager.getUserPos(seg.event.userId, false);
+					} else {
+						seg.col = i;
+					}
 					seg.level = j;
 					segs.push(seg);
 				}
@@ -905,14 +962,16 @@ function Agenda(element, options, methods) {
 				stop: function(ev, ui) {
 					view.clearOverlays();
 					view.trigger('eventDragStop', eventElement, event, ev, ui);
-					var mult = (options.multiUser && !options.allDaySlot) ? options.users.length : 1;
-					var cell = matrix.cell;
-					var dayDelta = dis * (
-						allDay ? // can't trust cell.colDelta when using slot grid
-							(cell ? cell.colDelta : 0) :
-							Math.floor((Math.floor((ui.position.left - origPosition.left) / colWidth + 0.01) + getUserPos(event.userId)) / mult) // 0.01 to avoid rounding issues
-					);
-					if (!cell || !slotDelta && !dayDelta) {
+					var cell = matrix.cell,
+						nbUsers = options.multiUser ? options.userManager.nbUsers() : 1,
+						userPos = options.multiUser ? options.userManager.getUserPos(event.userId) : 0,
+						dayDelta = dis * (
+							allDay ? // can't trust cell.colDelta when using slot grid
+								(cell ? cell.colDelta : 0) :
+								Math.floor((Math.floor((ui.position.left - origPosition.left) / colWidth + 0.01) + userPos) / nbUsers) // 0.01 to avoid rounding issues
+						),
+						userDelta = (options.multiUser && cell ? cell.colDelta : 0);
+					if (!cell || !slotDelta && !dayDelta && !userDelta) {
 						resetElement();
 						if ($.browser.msie) {
 							eventElement
@@ -920,9 +979,10 @@ function Agenda(element, options, methods) {
 								.find('span.fc-event-bg').css('display', ''); // .show() made display=inline
 						}
 						eventElement.css(origPosition); // sometimes fast drags make event revert to wrong position
+						timeElement.text(formatDates(event.start, event.end, view.option('timeFormat'))); 
 						view.showEvents(event, eventElement);
 					}else{
-						var newUserId = getUserId(cell.col%options.users.length);
+						var newUserId = options.multiUser ? options.userManager.getUserId(cell.col%options.userManager.nbUsers()) : 0;
 						view.eventDrop(
 							this, event, dayDelta,
 							allDay ? 0 : slotDelta * options.slotMinutes, // minute delta
@@ -1043,9 +1103,11 @@ function Agenda(element, options, methods) {
 		if (view.option('selectable')) {
 			selectionMatrix = buildSlotMatrix(function(cell) {
 				if (cell) {
-					var d = slotCellDate(cell.row, Math.floor(cell.origCol/options.users.length));
-					var pos = getUserPos(getUserId(cell.origCol));
-					slotSelectionManager.drag(d, addMinutes(cloneDate(d), options.slotMinutes), false, pos);
+					var pos = cell.origCol;
+					var d = slotCellDate(cell.row, Math.floor(cell.origCol/options.userManager.nbUsers(false)));
+					var pos = cell.origCol;
+					var userId = options.multiUser ? options.userManager.getUserId(cell.col%options.userManager.nbUsers()) : 0;
+					slotSelectionManager.drag(d, addMinutes(cloneDate(d), options.slotMinutes), false, pos, userId);
 				}else{
 					slotSelectionManager.drag();
 				}
@@ -1099,8 +1161,9 @@ function Agenda(element, options, methods) {
 		var helperOption = view.option('selectHelper');
 		if (helperOption) {
 			var col = dayDiff(startDate, view.visStart);
+			var nbUsers = options.userManager.nbUsers();
 			if (col >= 0 && col < colCnt) { // only works when times are on same day
-				var rect = selectionMatrix.rect(0, col*options.users.length*dis+dit+colPos, 1, col*options.users.length*dis+dit+colPos+1, bodyContent); // only for horizontal coords
+				var rect = selectionMatrix.rect(0, colPos, 1, colPos+1, bodyContent); // only for horizontal coords
 				var top = timePosition(startDate, startDate);
 				var bottom = timePosition(startDate, endDate);
 				if (bottom > top) { // protect against selections that are entirely before or after visible range
@@ -1283,7 +1346,7 @@ function Agenda(element, options, methods) {
 
 // count the number of colliding, higher-level segments (for event squishing)
 
-function countForwardSegs(levels) {
+function countForwardSegs(levels, checkUser) {
 	var i, j, k, level, segForward, segBack;
 	for (i=levels.length-1; i>0; i--) {
 		level = levels[i];
@@ -1291,7 +1354,7 @@ function countForwardSegs(levels) {
 			segForward = level[j];
 			for (k=0; k<levels[i-1].length; k++) {
 				segBack = levels[i-1][k];
-				if (segsCollide(segForward, segBack)) {
+				if (segsCollide(segForward, segBack, checkUser)) {
 					segBack.forward = Math.max(segBack.forward||0, (segForward.forward||0)+1);
 				}
 			}

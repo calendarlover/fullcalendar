@@ -64,8 +64,8 @@
 				}
 				callback(events);
 			});
-		}
+		};
 		
-	}
+	};
 
 })(jQuery);

@@ -96,21 +96,6 @@ function dayDiff(d1, d2) { // d1 - d2
 	return Math.round((cloneDate(d1, true) - cloneDate(d2, true)) / DAY_MS);
 }
 
-function setYMD(date, y, m, d) {
-	if (y !== undefined && y != date.getFullYear()) {
-		date.setDate(1);
-		date.setMonth(0);
-		date.setFullYear(y);
-	}
-	if (m !== undefined && m != date.getMonth()) {
-		date.setDate(1);
-		date.setMonth(m);
-	}
-	if (d !== undefined) {
-		date.setDate(d);
-	}
-}
-
 
 
 /* Date Parsing
@@ -282,29 +267,29 @@ var formatDates = fc.formatDates = function(date1, date2, format, options) {
 };
 
 var dateFormatters = {
-	s	: function(d)	{ return d.getSeconds() },
-	ss	: function(d)	{ return zeroPad(d.getSeconds()) },
-	m	: function(d)	{ return d.getMinutes() },
-	mm	: function(d)	{ return zeroPad(d.getMinutes()) },
-	h	: function(d)	{ return d.getHours() % 12 || 12 },
-	hh	: function(d)	{ return zeroPad(d.getHours() % 12 || 12) },
-	H	: function(d)	{ return d.getHours() },
-	HH	: function(d)	{ return zeroPad(d.getHours()) },
-	d	: function(d)	{ return d.getDate() },
-	dd	: function(d)	{ return zeroPad(d.getDate()) },
-	ddd	: function(d,o)	{ return o.dayNamesShort[d.getDay()] },
-	dddd: function(d,o)	{ return o.dayNames[d.getDay()] },
-	M	: function(d)	{ return d.getMonth() + 1 },
-	MM	: function(d)	{ return zeroPad(d.getMonth() + 1) },
-	MMM	: function(d,o)	{ return o.monthNamesShort[d.getMonth()] },
-	MMMM: function(d,o)	{ return o.monthNames[d.getMonth()] },
-	yy	: function(d)	{ return (d.getFullYear()+'').substring(2) },
-	yyyy: function(d)	{ return d.getFullYear() },
-	t	: function(d)	{ return d.getHours() < 12 ? 'a' : 'p' },
-	tt	: function(d)	{ return d.getHours() < 12 ? 'am' : 'pm' },
-	T	: function(d)	{ return d.getHours() < 12 ? 'A' : 'P' },
-	TT	: function(d)	{ return d.getHours() < 12 ? 'AM' : 'PM' },
-	u	: function(d)	{ return formatDate(d, "yyyy-MM-dd'T'HH:mm:ss'Z'") },
+	s	: function(d)	{ return d.getSeconds(); },
+	ss	: function(d)	{ return zeroPad(d.getSeconds()); },
+	m	: function(d)	{ return d.getMinutes(); },
+	mm	: function(d)	{ return zeroPad(d.getMinutes()); },
+	h	: function(d)	{ return d.getHours() % 12 || 12; },
+	hh	: function(d)	{ return zeroPad(d.getHours() % 12 || 12); },
+	H	: function(d)	{ return d.getHours(); },
+	HH	: function(d)	{ return zeroPad(d.getHours()); },
+	d	: function(d)	{ return d.getDate(); },
+	dd	: function(d)	{ return zeroPad(d.getDate()); },
+	ddd	: function(d,o)	{ return o.dayNamesShort[d.getDay()]; },
+	dddd: function(d,o)	{ return o.dayNames[d.getDay()]; },
+	M	: function(d)	{ return d.getMonth() + 1; },
+	MM	: function(d)	{ return zeroPad(d.getMonth() + 1); },
+	MMM	: function(d,o)	{ return o.monthNamesShort[d.getMonth()]; },
+	MMMM: function(d,o)	{ return o.monthNames[d.getMonth()]; },
+	yy	: function(d)	{ return (d.getFullYear()+'').substring(2); },
+	yyyy: function(d)	{ return d.getFullYear(); },
+	t	: function(d)	{ return d.getHours() < 12 ? 'a' : 'p'; },
+	tt	: function(d)	{ return d.getHours() < 12 ? 'am' : 'pm'; },
+	T	: function(d)	{ return d.getHours() < 12 ? 'A' : 'P'; },
+	TT	: function(d)	{ return d.getHours() < 12 ? 'AM' : 'PM'; },
+	u	: function(d)	{ return formatDate(d, "yyyy-MM-dd'T'HH:mm:ss'Z'"); },
 	S	: function(d)	{
 		var date = d.getDate();
 		if (date > 10 && date < 20) {
@@ -420,6 +405,9 @@ function HoverMatrix(rowElements, colElements, changeCallback) {
 		var x = ev.pageX;
 		var y = ev.pageY;
 		var r, c;
+		
+		lefts.sort(function(a, b){ return parseInt(a, 10) > parseInt(b, 10); });
+		
 		for (r=0; r<tops.length && y>=tops[r]; r++) {}
 		for (c=0; c<lefts.length && x>=lefts[c]; c++) {}
 		r = r >= tops.length ? -1 : r - 1;
@@ -469,8 +457,7 @@ function HoverMatrix(rowElements, colElements, changeCallback) {
 /* Misc Utils
 -----------------------------------------------------------------------------*/
 
-var undefined,
-	dayIDs = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+var dayIDs = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 function zeroPad(n) {
 	return (n < 10 ? '0' : '') + n;
@@ -492,12 +479,12 @@ function smartProperty(obj, name) { // get a camel-cased/namespaced property of 
 }
 
 function htmlEscape(s) {
-	return s.replace(/&/g, '&amp;')
+	return s
+		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/'/g, '&#039;')
-		.replace(/"/g, '&quot;')
-		.replace(/\n/g, '<br />');
+		.replace(/"/g, '&quot;');
 }
 
 
@@ -553,7 +540,7 @@ function exclEndDay(event) {
 
 function _exclEndDay(end, allDay) {
 	end = cloneDate(end);
-	return allDay || end.getHours() || end.getMinutes() ? addDays(end, 1) : clearTime(end);
+	return allDay || end.getHours() || end.getMinutes() ? addDays(end, 1) : end;
 }
 
 

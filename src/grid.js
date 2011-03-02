@@ -130,7 +130,9 @@ function Grid(element, options, methods) {
 		renderGrid: renderGrid,
 		renderEvents: renderEvents,
 		rerenderEvents: rerenderEvents,
+		renderFreeBusys: function(){},
 		clearEvents: clearEvents,
+		clearFreeBusys: function(){},
 		setHeight: setHeight,
 		setWidth: setWidth,
 		defaultEventEnd: function(event) { // calculates an end if event doesnt have one, mostly for resizing
@@ -333,11 +335,7 @@ function Grid(element, options, methods) {
 	
 	function setWidth(width) {
 		viewWidth = width;
-		if(options.multiUser && !options.allDaySlot){
-			colWidth = Math.floor(viewWidth / colCnt);
-		} else {
-			colWidth = Math.floor(viewWidth / colCnt*options.users.length);
-		}
+		colWidth = Math.floor(viewWidth / colCnt);
 		dayContentPositions.clear();
 		setOuterWidth(
 			thead.find('th').slice(0, -1),
@@ -352,8 +350,15 @@ function Grid(element, options, methods) {
 	
 	
 	function renderEvents(events) {
-		view.reportEvents(cachedEvents = events);
-		renderSegs(compileSegs(events));
+		var len = events.length,
+			visibleEvents = [];
+		for (var i=0; i<len; i++) {
+			if (events[i].visible) {
+				visibleEvents.push(events[i]);
+			}
+		}
+		view.reportEvents(cachedEvents = visibleEvents);
+		renderSegs(compileSegs(visibleEvents));
 	}
 	
 	
@@ -378,7 +383,7 @@ function Grid(element, options, methods) {
 			k, seg,
 			segs=[];
 		for (i=0; i<rowCnt; i++) {
-			row = stackSegs(view.sliceSegs(events, visEventsEnds, d1, d2));
+			row = stackSegs(view.sliceSegs(events, visEventsEnds, d1, d2), false);
 			for (j=0; j<row.length; j++) {
 				level = row[j];
 				for (k=0; k<level.length; k++) {
@@ -464,7 +469,7 @@ function Grid(element, options, methods) {
 					view.trigger('eventDragStop', eventElement, event, ev, ui);
 					if (dayDelta) {
 						eventElement.find('a').removeAttr('href'); // prevents safari from visiting the link
-						view.eventDrop(this, event, dayDelta, 0, event.allDay, ev, ui);
+						view.eventDrop(this, event, dayDelta, 0, event.userId, event.allDay, ev, ui);
 					}else{
 						if ($.browser.msie) {
 							eventElement.css('filter', ''); // clear IE opacity side-effects

@@ -118,11 +118,12 @@ var viewMethods = {
 	eventDrop: function(e, event, dayDelta, minuteDelta, newUserId, allDay, ev, ui) {
 		var view = this,
 			oldAllDay = event.allDay,
+			oldUserId = event.userId,
 			eventId = event._id;
-		view.moveEvents(view.eventsByID[eventId], dayDelta, minuteDelta, allDay);
+		view.moveEvents(view.eventsByID[eventId], dayDelta, minuteDelta, newUserId, allDay);
 		view.trigger('eventDrop', e, event, dayDelta, minuteDelta, newUserId, allDay, function() { // TODO: change docs
 			// TODO: investigate cases where this inverse technique might not work
-			view.moveEvents(view.eventsByID[eventId], -dayDelta, -minuteDelta, oldAllDay);
+			view.moveEvents(view.eventsByID[eventId], -dayDelta, -minuteDelta, oldUserId, oldAllDay);
 			view.rerenderEvents();
 		}, ev, ui);
 		view.eventsChanged = true;
@@ -146,10 +147,11 @@ var viewMethods = {
 	
 	// event modification
 	
-	moveEvents: function(events, dayDelta, minuteDelta, allDay) {
+	moveEvents: function(events, dayDelta, minuteDelta, newUserId, allDay) {
 		minuteDelta = minuteDelta || 0;
 		for (var e, len=events.length, i=0; i<len; i++) {
 			e = events[i];
+			e.userId = newUserId;
 			if (allDay !== undefined) {
 				e.allDay = allDay;
 			}
@@ -331,7 +333,7 @@ function lazySegBind(container, segs, bindHandlers) {
 
 // event rendering calculation utilities
 
-function stackSegs(segs) {
+function stackSegs(segs, checkUser) {
 	var levels = [],
 		i, len = segs.length, seg,
 		j, collide, k;
@@ -342,7 +344,7 @@ function stackSegs(segs) {
 			collide = false;
 			if (levels[j]) {
 				for (k=0; k<levels[j].length; k++) {
-					if (segsCollide(levels[j][k], seg)) {
+					if (segsCollide(levels[j][k], seg, checkUser)) {
 						collide = true;
 						break;
 					}
@@ -367,8 +369,8 @@ function segCmp(a, b) {
 	return  (b.msLength - a.msLength) * 100 + (a.event.start - b.event.start);
 }
 
-function segsCollide(seg1, seg2) {
-	return seg1.end > seg2.start && seg1.start < seg2.end;
+function segsCollide(seg1, seg2, checkUser) {
+	return (checkUser ? seg1.event.userId == seg2.event.userId : true) && seg1.end > seg2.start && seg1.start < seg2.end;
 }
 
 
